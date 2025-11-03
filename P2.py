@@ -928,8 +928,8 @@ class DarkEditor(tkinter.Tk):
     def show_help_in_textarea(self):
         help_text = (
             "Ayuda proporcionada al contactar con:\n\n"
-            "- Lizbth Andrea Herrera Ortega - 31415\n"
-            "- Marcela Nicole Letran Lee - 777\n"
+            "-Lizbeth Andrea Herrera Ortega – 1246024\n"
+            "-Marcela Nicole Letran Lee – 1102124\n"
         )
         self.text_area.delete(1.0, tkinter.END)
         self.text_area.insert(tkinter.END, help_text)
