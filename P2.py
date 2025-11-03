@@ -4,8 +4,6 @@ import tkinter
 from tkinter import filedialog, messagebox, scrolledtext
 import webbrowser
 
-
-
 #rutas
 #convert en ruta abs.carpeta.archivo actual
 ABS_PATH = os.path.abspath(os.path.dirname(__file__))
@@ -117,19 +115,6 @@ def mirar(estado):
     return estado["texto"][i] if i < estado["n"] else None
 
 def avanzar(estado):
-    """
-    Llama a mirar(estado) para obtener el carácter actual.
-    Si no hay más caracteres (None), termina.
-    Si hay un carácter:
-    Avanza el índice i en 1.
-    Si el carácter era un salto de línea \n:
-    incrementa la fila (fila += 1).
-    reinicia la columna (col = 1).
-    Si no era salto de línea:
-    incrementa la columna (col += 1).
-    Devuelve el carácter leído.
-    Es la operación de "consume": leer un carácter y mover el puntero.
-    """
     c = mirar(estado)
     if c is None: 
         return None
@@ -148,10 +133,6 @@ def agregar_error(estado, lexema, tipo, fila=None, col=None):
 
 #lectura de etiquetas
 def lex_etiqueta(estado):
-    """
-    Lee literalmente desde '<' hasta el primer '>' (incluido).
-    Si no se cierra, registra error y devuelve (None, fila, col) del inicio.
-    """
     assert mirar(estado) == "<"
     start_f, start_c = estado["fila"], estado["col"]
     buf = [avanzar(estado)]#consume <
@@ -166,11 +147,6 @@ def lex_etiqueta(estado):
     return "".join(buf), start_f, start_c
 
 def extraer_hasta_cierre(estado, nombre_cierre):
-    """
-    Extrae todo el contenido textual (o etiquetas anidadas como content) 
-    hasta encontrar la etiqueta de cierre esperada </NOMBRE>.
-    Si no la encuentra, registra error y devuelve (None, None, None).
-    """
     start_f, start_c = estado["fila"], estado["col"]
     buf = []
     while True:
@@ -197,17 +173,8 @@ def extraer_hasta_cierre(estado, nombre_cierre):
         else:
             buf.append(avanzar(estado))
 
-#aplicación dfa a <numero>
+#aplicación dfa
 class DFA:
-    """
-    Implementación clara de un DFA:
-    - alfabeto: conjunto finito de símbolos abstractos (no caracteres directos).
-    - transiciones: dict estado -> (símbolo -> estado siguiente).
-    - estado_inicial, estados_finales y estado_error.
-
-    >>> e' = mover(e, s)  # transición definida o a error
-    >>> acepta([s1, s2, ...], traza)  # recorre y opcionalmente guarda la traza paso a paso
-    """
     #constructor
     def __init__(self, alfabeto, transiciones, estado_inicial, finales, estado_error):
         self.alfabeto=set(alfabeto)
@@ -221,10 +188,7 @@ class DFA:
 
     def acepta(self, simbolos, recolector_traza=None):
         """
-        Recorre secuencialmente las transiciones. Si 'recolector_traza' es una lista,
-        se añade un diccionario por cada paso con:
-            pos, simbolo, desde, hasta
-            (posición, símbolo, estado origen y destino).
+        posición, símbolo, estado origen y destino
         """
         e=self.estado_inicial
         for idx,s in enumerate(simbolos):
@@ -237,10 +201,9 @@ class DFA:
 class NumeroRecognizer:
     """
     Reconoce er
-        (+|-) ? s* digit+ s* ( (.|/) s* digit+ ) ?
+        (+|-) ? s* digit+ s* ( . s* digit+ ) ?
     Donde:
-        - 's' es cualquier espacio ( ' ', '\\t', '\\r', '\\n' )
-        - '.' permiten parte fraccionaria
+    's' es cualquier espacio ' ', '\\t', '\\r', '\\n'
     """
     def __init__(self, allow_slash=True, allow_espacios=True):
         self.allow_slash=allow_slash
@@ -248,14 +211,6 @@ class NumeroRecognizer:
         self.alfabeto={"digit","+","-",".","s"}
         if allow_slash:
             self.alfabeto.add("/")
-        # Estados: 
-        #   q0: inicio (espacios iniciales, signo, dígito)
-        #   qS: se vio signo; se esperan espacios y/o dígitos
-        #   qD: se han leído 1+ dígitos o decimales o espacios finales
-        #   qSep: se vio punto decimal y luego dígitos
-        #   qF: se han leído dígitos de la parte fraccionaria
-        #   qA: espacios de aceptación al final
-        #   E: error
         self.dfa = DFA(
             self.alfabeto,
             {
@@ -276,11 +231,6 @@ class NumeroRecognizer:
         if ch in "+-.": return ch
         return None
 
-        """
-        Limpia la cadena.
-        Convierte cada carácter en símbolo.
-        Ejecuta el DFA para decidir si es válido.
-        """
     def es_valido(self,s,recolector_traza=None):
         if s is None: return False
         s=s.strip()
@@ -305,29 +255,18 @@ def validar_entero_formato(s):
 VALID_TOKENS = {"SUMA","RESTA","MULTIPLICACION","DIVISION","POTENCIA","RAIZ","INVERSO","MOD"}
 
 def procesar_operacion_apertura(estado, interno, fila, col):
-    """
-    <Operacion= NOMBRE>
-    - Valida que exista '=' y que NOMBRE ∈ VALID_TOKENS.
-    - Agrega token OPEN_OPERACION con valor=nombre normalizado.
-    """
     rest = interno[len("OPERACION"):].strip()
     if not rest.startswith("="):
-        agregar_error(estado, f"<Operacion{rest}>","FormatoOperacionInvalido", fila, col); 
+        agregar_error(estado, f"<Operacion{rest}>","Format ode operacion invalido", fila, col); 
         return
     nombre = rest[1:].strip().split()[0] if rest[1:].strip() else ""
     up = nombre.upper()
     if up in VALID_TOKENS:
         estado["tokens"].append(crear_token("OPEN_OPERACION", f"<Operacion= {up}>", fila, col, valor=up))
     else:
-        agregar_error(estado, f"<Operacion={nombre}>","NombreOperacionInvalido", fila, col)
+        agregar_error(estado, f"<Operacion={nombre}>","Nombre de operacion invalido", fila, col)
 
 def analizar(estado, recolectar_trazas=False):
-    """
-    Escáner general del mini-lenguaje:
-    - Reconoce etiquetas de apertura/cierre y su contenido (Numero, P, R).
-    - Valida Número con DFA (con traza opcional en errores).
-    - Mantiene errores y continúa.
-    """
     while True:
         c=mirar(estado)
         if c is None: break
@@ -369,7 +308,7 @@ def analizar(estado, recolectar_trazas=False):
                         estado["tokens"].append(crear_token("NUMERO", val, rf, rc, valor=val))
                     else:
                         # En errores dejamos opcionalmente la traza para depurar el DFA.
-                        agregar_error(estado, f"{val} TRAZA={traza}" if traza else val, "NumeroInvalido", rf, rc)
+                        agregar_error(estado, f"{val} TRAZA={traza}" if traza else val, "Numero invalido", rf, rc)
                 continue
 
             if up=="P":
@@ -380,7 +319,7 @@ def analizar(estado, recolectar_trazas=False):
                 if validar_entero_formato(v):
                     estado["tokens"].append(crear_token("P_VAL", v, rf, rc, valor=v))
                 else:
-                    agregar_error(estado, v, "PInvalido", rf, rc)
+                    agregar_error(estado, v, "Potencia invalido", rf, rc)
                 continue
 
             if up=="R":
@@ -391,9 +330,9 @@ def analizar(estado, recolectar_trazas=False):
                 if validar_entero_formato(v) and not v.startswith("-"):
                     estado["tokens"].append(crear_token("R_VAL", v, rf, rc, valor=v))
                 elif validar_entero_formato(v) and v.startswith("-"):
-                    agregar_error(estado, v, "R debe ser positivo", rf, rc)
+                    agregar_error(estado, v, "Raiz debe ser positivo", rf, rc)
                 else:
-                    agregar_error(estado, v, "R invalido", rf, rc)
+                    agregar_error(estado, v, "Raiz invalido", rf, rc)
                 continue
 
             # etiqueta no reconocida
@@ -425,61 +364,121 @@ class OpNode:
         return f"Op({self.kind}, {self.children}{', '+', '.join(tail) if tail else ''})"
 
 def _parse_operation(tokens, i):
-    """
-    Parsea recursivamente una operación:
-    OPEN_OPERACION ... (NUMERO | OPEN_OPERACION | P_VAL | R_VAL)* ... CLOSE_OPERACION
-    Retorna (nodo_op, j) donde j es el índice del CLOSE correspondiente.
-    """
-    assert tokens[i]["tipo"]=="OPEN_OPERACION"
-    k=tokens[i]["valor"]
-    children=[]
-    p=None
-    r=None
-    j=i+1
-    L=len(tokens)
-    while j<L and tokens[j]["tipo"]!="CLOSE_OPERACION":
-        t=tokens[j]
-        if t["tipo"]=="NUMERO":
+    assert tokens[i]["tipo"] == "OPEN_OPERACION"
+    op = tokens[i]["valor"]
+    fila0 = tokens[i]["fila"]
+    col0  = tokens[i]["columna"]
+
+    children = []
+    p = None
+    r = None
+    j = i + 1
+    L = len(tokens)
+    invalid_block = False
+
+    if tokens[i].get("invalid") is True:
+        invalid_block = True
+
+    exact = {"INVERSO": 1, "MOD": 2, "POTENCIA": 1, "RAIZ": 1}
+    needs_P = (op == "POTENCIA")
+    needs_R = (op == "RAIZ")
+
+    def done_exact():
+        if op not in exact:
+            return False
+        if len(children) != exact[op]:
+            return False
+        if needs_P and (p is None):
+            return False
+        if needs_R and (r is None):
+            return False
+        return True
+
+    while j < L and tokens[j]["tipo"] != "CLOSE_OPERACION":
+        t = tokens[j]
+        tt = t["tipo"]
+
+        if tt == "NUMERO":
             children.append(NUMERONode(t["valor"]))
-        elif t["tipo"]=="OPEN_OPERACION":
-            sub,j2=_parse_operation(tokens,j)
+
+        elif tt == "OPEN_OPERACION":
+            sub, j2 = _parse_operation(tokens, j)
+            if getattr(sub, "invalida", False):
+                invalid_block = True
             children.append(sub)
-            j=j2
-        elif t["tipo"]=="P_VAL":
-            try: p=int(t["valor"])
-            except: p=None
-        elif t["tipo"]=="R_VAL":
-            try: r=int(t["valor"])
-            except: r=None
-        j+=1
-    return OpNode(k,children,p=p,r=r), j
+            j = j2
+
+        elif tt == "P_VAL":
+            try:
+                p = int(t["valor"])
+            except Exception:
+                p = None
+                invalid_block = True 
+
+        elif tt == "R_VAL":
+            try:
+                r = int(t["valor"])
+            except Exception:
+                r = None
+                invalid_block = True
+
+        elif tt in ("CLOSE_NUMERO", "CLOSE_P", "CLOSE_R"):
+            invalid_block = True
+
+        else:
+            invalid_block = True
+
+        j += 1
+
+
+        if done_exact():
+            if j < L and tokens[j]["tipo"] != "CLOSE_OPERACION":
+                invalid_block = True
+                _add_parser_error(fila0, col0, "Cierre operacion faltante",
+                                  f"cierre </Operacion> faltante para {op}")
+                node = OpNode(op, children, p=p, r=r)
+                node.invalid = True
+                return node, j - 1
+
+    #no mas tokens y no hubo CLOSE
+    if j >= L:
+        invalid_block = True
+        _add_parser_error(fila0, col0, "Cierre de operacion faltante",
+                          f"Falta </Operacion> para {op}")
+        node = OpNode(op, children, p=p, r=r)
+        node.invalid = True
+        return node, j
+
+    #CLOSE_OPERACION encontrado
+    node = OpNode(op, children, p=p, r=r)
+    if invalid_block:
+        node.invalid = True
+    return node, j
 
 def parse_all_operations(tokens):
-    out=[]
-    i=0
-    L=len(tokens)
-    while i<L:
-        if tokens[i]["tipo"]=="OPEN_OPERACION":
-            node,j=_parse_operation(tokens,i)
+    out = []
+    i = 0
+    L = len(tokens)
+    while i < L:
+        t = tokens[i]
+        if t["tipo"] == "OPEN_OPERACION":
+            node, j = _parse_operation(tokens, i)
             out.append(node)
-            i=j
-        i+=1
+            i = j + 1
+        else:
+            i += 1
     return out
 
-# --------------------- VALIDACIÓN SEMÁNTICA ---------------------
+_PARSER_ERRORS = []
+
+def _add_parser_error(fila, col, tipo, detalle):
+    _PARSER_ERRORS.append((detalle, tipo, fila, col))
+
+#VALIDACIÓN SEMÁNTICA 
 def op_is_valid(node):
-    """
-    Valida estructura y aridad por tipo:
-    - SUMA/RESTA/MULTIPLICACION/DIVISION: >= 2 argumentos
-    - MOD: == 2 argumentos
-    - INVERSO: == 1 argumento
-    - POTENCIA: 1 argumento + P definido
-    - RAIZ:     1 argumento + R definido y positivo
-    """
     for ch in getattr(node, "children", []):
         if isinstance(ch, OpNode) and (not op_is_valid(ch)):
             return False
-        # NUMERONode es siempre válido
 
     k=node.kind
     n=len(node.children)
@@ -496,7 +495,34 @@ def op_is_valid(node):
     return False
 
 def filter_valid_asts(asts):
-    return [n for n in asts if op_is_valid(n)]
+    def is_valid(node):
+        # Bandera de invalidez estructural
+        if getattr(node, "invalid", False):
+            return False
+
+        # Validar hijos (recursivo)
+        for ch in getattr(node, "children", []):
+            if isinstance(ch, OpNode):
+                if not is_valid(ch):
+                    return False
+            # NUMERONode siempre válido
+
+        # Validación semántica por aridad / etiquetas
+        k = node.kind
+        n = len(node.children)
+        if k in {"SUMA","RESTA","MULTIPLICACION","DIVISION"}:
+            return n >= 2
+        if k == "INVERSO":
+            return n == 1
+        if k == "MOD":
+            return n == 2
+        if k == "POTENCIA":
+            return n == 1 and (node.p is not None)
+        if k == "RAIZ":
+            return n == 1 and (node.r is not None)
+        return False
+
+    return [n for n in asts if is_valid(n)]
 
 #evaluar
 def _eval_ltr(values, op):
@@ -576,9 +602,6 @@ def _collect_tree(root):
     return nodes, edges
 
 def _layout(nodes, edges, h_gap=80, v_gap=110, box_w=120, box_h=50):
-    """
-    Layout jerárquico sencillo con anchura proporcional al número de hijos
-    """
     children={}
     kids=set()
     for a,b in edges:
@@ -640,17 +663,12 @@ def write_svg(nodes, edges, out_path, fill_color="#ffc0cb"):
 
 #guardado de reportes
 def save_hierarchies_and_reports(TOKENS_info, errores, out_dir="outputs"):
-    """
-    Genera los 3 HTML INDEPENDIENTES y los árboles en /trees.
-    IMPORTANTE: SOLO genera filas/árboles para operaciones VÁLIDAS (TOKENS_info).
-    Aquí también se "deja constancia" de cómo se generan los árboles (SVG/PNG).
-    """
     os.makedirs(out_dir, exist_ok=True)
     trees_dir=os.path.join(out_dir,"trees")
     os.makedirs(trees_dir, exist_ok=True)
 
     # Depuración jerarquías
-    txt_path=os.path.join(out_dir,"hierarchies.txt")
+    txt_path=os.path.join(out_dir,"jerarquias.txt")
     with open(txt_path,"w",encoding="utf-8") as f:
         for info in TOKENS_info:
             nodes,edges=_collect_tree(info["root"])
@@ -662,14 +680,13 @@ def save_hierarchies_and_reports(TOKENS_info, errores, out_dir="outputs"):
                 f.write(f"  {a} -> {b}\n")
             f.write("\n")
             #genracion de arboles jerarquicos
-            svg_path=os.path.join(trees_dir, f"operation_{info['index']}.svg")
+            svg_path = os.path.join(out_dir, f"arbol_{info['index']}.svg")
             write_svg(nodes, edges, svg_path, fill_color="#ffc0cb")
 
     # Operaciones
     op_rows = []
     for info in TOKENS_info:
-        svg_rel = f"trees/operation_{info['index']}.svg"
-        # construir links clicables (relativos al html) que abrirán en una nueva pestaña
+        svg_rel = f"arbol_{info['index']}.svg"
         arbol_html = f'<a href="{svg_rel}" target="_blank">SVG</a>'
 
         op_rows.append([
@@ -698,7 +715,7 @@ def save_hierarchies_and_reports(TOKENS_info, errores, out_dir="outputs"):
     resumen_rows = [
         ["Operaciones válidas", str(len(TOKENS_info))],
         ["Errores léxicos", str(len(errores))],
-        ["Gráficos por operación", f"{len(TOKENS_info)} SVG" + (f" + {len(TOKENS_info)} PNG" )]
+        ["Gráficos por operación", f"{len(TOKENS_info)} SVG"]
     ]
     idx_html = html_tabla("Resumen General", ["Concepto","Valor"], resumen_rows)
     with open(os.path.join(out_dir,"index.html"),"w",encoding="utf-8") as f: 
@@ -708,17 +725,12 @@ def save_hierarchies_and_reports(TOKENS_info, errores, out_dir="outputs"):
         "index_html":os.path.join(out_dir,"index.html"),
         "operaciones_html":os.path.join(out_dir,"operaciones.html"),
         "errores_html":os.path.join(out_dir,"errores.html"),
-        "hierarchies_txt":txt_path,
-        "trees_dir":trees_dir
+        "jerarquias_txt":txt_path,
+        "arboles_dir":trees_dir
     }
 
 #pipeline principal del analizador
 def analizar_texto_o_ruta(source_tuple, recolectar_trazas=False, out_dir="outputs"):
-    """
-    Orquesta todo el proceso de análisis.
-    - source_tuple: ("file", ruta) ó ("text", contenido)
-    - Genera SIEMPRE outputs individuales; SOLO con operaciones válidas hay filas/árboles.
-    """
     #entrada
     if source_tuple[0] == "file":
         texto = leer_txt(source_tuple[1])
@@ -731,6 +743,12 @@ def analizar_texto_o_ruta(source_tuple, recolectar_trazas=False, out_dir="output
 
     #parseo → ASTs
     asts_all = parse_all_operations(tokens)
+
+    # combinar errores de parseo (cierre faltante, etc.)
+    global _PARSER_ERRORS
+    for lexema, tipo, fila, col in _PARSER_ERRORS:
+        errores.append(crear_error(lexema, tipo, fila, col))
+    _PARSER_ERRORS = []
 
     #filtro semántico → SOLO VÁLIDAS
     asts_valid = filter_valid_asts(asts_all)
@@ -745,14 +763,6 @@ def analizar_texto_o_ruta(source_tuple, recolectar_trazas=False, out_dir="output
 
 #HOOK PARA LA UI
 def run_analyzer(source_tuple, outputs_dir):
-    """
-    Hook llamado por la interfaz.
-    Genera:
-      - outputs/index.html
-      - outputs/operaciones.html
-      - outputs/errores.html
-      - outputs/trees/* (árboles)
-    """
     try:
         os.makedirs(outputs_dir, exist_ok=True)
         _, _, _ = analizar_texto_o_ruta(source_tuple, recolectar_trazas=False, out_dir=outputs_dir)
@@ -762,9 +772,6 @@ def run_analyzer(source_tuple, outputs_dir):
 
 #INTERFAZ (TKINTER)
 class DarkEditor(tkinter.Tk):
-    """
-    Interfaz unificada. Mantiene la barra superior y el panel derecho.
-    """
     def __init__(self):
         super().__init__()
         self.title("Analizador de Operaciones Aritméticas")
@@ -831,11 +838,6 @@ class DarkEditor(tkinter.Tk):
         self.status = tkinter.Label(self, text="Nuevo documento", bg="#2b0f14", fg="#f3b2bc", anchor="w")
         self.status.pack(side=tkinter.BOTTOM, fill=tkinter.X)
 
-        # Atajos
-        self.bind_all("<Control-s>", lambda e: self.save_file())
-        self.bind_all("<Control-o>", lambda e: self.open_file())
-        self.bind_all("<Control-Shift-S>", lambda e: self.save_file_as())
-
     def _add_right_button(self, parent, label_text, filename, html=False, image=False):
         frame = tkinter.Frame(parent, bg="#3a0f16")
         frame.pack(fill=tkinter.X, pady=8, padx=14)
@@ -900,9 +902,7 @@ class DarkEditor(tkinter.Tk):
         elif os.path.exists(path_in_outputs):
             path = path_in_outputs
         else:
-            messagebox.showwarning("No encontrado",
-                                   f"No se encontró '{filename}' en:\n- {DOCS_DIR}\n- {OUTPUTS_DIR}\n\n"
-                                   "Coloca el archivo allí o ejecuta 'Analizar Archivo' para generarlo.")
+            messagebox.showwarning("No encontrado", f"No se encontró '{filename}' en:\n- {DOCS_DIR}\n- {OUTPUTS_DIR}")
             return
         try:
             url = "file://" + os.path.abspath(path)
@@ -927,20 +927,15 @@ class DarkEditor(tkinter.Tk):
     #Boton ayuda
     def show_help_in_textarea(self):
         help_text = (
-            "Ayuda - Instrucciones rápidas\n\n"
-            "- 'Abrir Archivo' para cargar un archivo de texto.\n"
-            "- 'Guardar Archivo' / 'Guardar Como' funcionan normalmente.\n"
-            "- 'Analizar Archivo' ejecuta la lógica del analizador y genera HTMLs en 'outputs'.\n"
-            "- 'Resultados Generales' abre 'index.html'.\n"
-            "- En 'Resultados finales' también puedes abrir 'operaciones.html' y 'errores.html'.\n"
-            "- Los árboles se generan como archivos SVG (y PNG si hay Pillow) en 'outputs/trees/'.\n"
-            "  En 'operaciones.html' se indica la ruta textual de cada árbol.\n"
+            "Ayuda proporcionada al contactar con:\n\n"
+            "- Lizbth Andrea Herrera Ortega - 31415\n"
+            "- Marcela Nicole Letran Lee - 777\n"
         )
         self.text_area.delete(1.0, tkinter.END)
         self.text_area.insert(tkinter.END, help_text)
         self.status.config(text="Mostrando Ayuda")
 
-    # --------- Demos mínimos para evitar 'no encontrado' ---------
+    #demos para prevenir erro en docs
     def _create_demo_docs_if_missing(self):
         sample_pdfs = ["manual_usuario.pdf", "manual_tecnico.pdf"]
         for p in sample_pdfs:
@@ -949,7 +944,7 @@ class DarkEditor(tkinter.Tk):
                 with open(path, "wb") as f:
                     f.write(b"%PDF-1.0\n%EOF\n")
 
-# --------------------- MAIN ---------------------
+#nain
 if __name__ == "__main__":
     app = DarkEditor()
     app.mainloop()
