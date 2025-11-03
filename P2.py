@@ -780,7 +780,6 @@ class DarkEditor(tkinter.Tk):
         self.current_filepath = None
         ensure_dirs()
         self._build_ui()
-        self._create_demo_docs_if_missing()
 
     def _build_ui(self):
         # Barra superior
@@ -832,7 +831,7 @@ class DarkEditor(tkinter.Tk):
         self._add_right_button(right, "Resultados Operaciones", "operaciones.html", html=True)
         self._add_right_button(right, "Errores Léxicos", "errores.html", html=True)
 
-        tkinter.Button(right, text="Ayuda", command=self.show_help_in_textarea,
+        tkinter.Button(right, text="Ayuda", command=self.help_text,
                   bg="#9b4b52", fg="#ffffff", activebackground="#b35a60", bd=0, padx=12, pady=8).pack(side=tkinter.BOTTOM, pady=24)
 
         self.status = tkinter.Label(self, text="Nuevo documento", bg="#2b0f14", fg="#f3b2bc", anchor="w")
@@ -925,7 +924,7 @@ class DarkEditor(tkinter.Tk):
             messagebox.showerror("Analizar - Error", f"El analizador falló:\n{msg}")
 
     #Boton ayuda
-    def show_help_in_textarea(self):
+    def help_text(self):
         help_text = (
             "Ayuda proporcionada al contactar con:\n\n"
             "-Lizbeth Andrea Herrera Ortega – 1246024\n"
@@ -934,15 +933,6 @@ class DarkEditor(tkinter.Tk):
         self.text_area.delete(1.0, tkinter.END)
         self.text_area.insert(tkinter.END, help_text)
         self.status.config(text="Mostrando Ayuda")
-
-    #demos para prevenir erro en docs
-    def _create_demo_docs_if_missing(self):
-        sample_pdfs = ["manual_usuario.pdf", "manual_tecnico.pdf"]
-        for p in sample_pdfs:
-            path = os.path.join(DOCS_DIR, p)
-            if not os.path.exists(path):
-                with open(path, "wb") as f:
-                    f.write(b"%PDF-1.0\n%EOF\n")
 
 #nain
 if __name__ == "__main__":
